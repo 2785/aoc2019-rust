@@ -1,5 +1,6 @@
 pub mod day1;
 pub mod day2;
+pub mod day3;
 
 use clap::Clap;
 use std::fs;
@@ -43,6 +44,29 @@ impl Day2 {
         print!(
             "Part 2 Solution: {}\n",
             day2::solve_part_2(&mut com.clone()).expect("error solving part 2")
+        );
+    }
+}
+
+#[derive(Clap)]
+pub struct Day3 {
+    #[clap(short = '3', long = "d3", default_value = "inputs/d3")]
+    input: String,
+}
+
+impl Day3 {
+    pub fn run(&self) {
+        let f = fs::read_to_string(&self.input).expect("error reading file");
+        let input = day3::parse_input(f).expect("error parsing input");
+
+        print!(
+            "Part 1 Solution: {}\n",
+            day3::solve_part_1(&input.0, &input.1)
+        );
+
+        print!(
+            "Part 2 Solution: {}\n",
+            day3::solve_part_2(&input.0, &input.1)
         );
     }
 }
