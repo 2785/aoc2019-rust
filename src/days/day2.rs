@@ -15,10 +15,10 @@ pub fn parse_input(f: String) -> Result<IntcodeComputer, ParseIntError> {
 }
 
 pub fn solve_part_1(com: &mut IntcodeComputer) -> Result<isize, intcode::ExecutionError> {
-    com.set(1, 12)?;
-    com.set(2, 2)?;
+    com.set(1, 12);
+    com.set(2, 2);
 
-    while !com.step()? {}
+    while !com.step(None)?.0 {}
 
     Ok(com.get_val(0)?)
 }
@@ -35,9 +35,9 @@ pub fn solve_part_2(com: &mut IntcodeComputer) -> Result<isize, intcode::Executi
         .par_iter()
         .find_any(|(n, v)| {
             let mut c = com.clone();
-            c.set(1, *n).expect("cannot set");
-            c.set(2, *v).expect("cannot set");
-            while !c.step().expect("error stepping in intcode com") {}
+            c.set(1, *n);
+            c.set(2, *v);
+            while !c.step(None).expect("error stepping in intcode com").0 {}
             com.get_val(0)
                 .expect("error getting pos 0, this should not happen")
                 == 19690720
