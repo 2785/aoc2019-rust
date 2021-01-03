@@ -19,47 +19,96 @@ pub fn parse_input(f: String) -> Result<(isize, isize), Box<dyn Error>> {
     Ok((ints[0].clone(), ints[1].clone()))
 }
 
-pub fn solve_part_1(lo: isize, hi: isize) -> Result<isize, Box<dyn Error>> {
-    let mut counter = 0;
+pub fn solve_part_1(lo: isize, hi: isize) -> isize {
+    (lo..hi + 1)
+        .into_par_iter()
+        .filter_map(|n| if valid_1(n) { Some(n) } else { None })
+        .collect::<Vec<isize>>()
+        .len() as isize
+}
 
-    for n in lo..hi + 1 {
-        // break down to parts
-        let digits: Vec<u8> = n
-            .to_string()
-            .split("")
-            .into_iter()
-            .filter_map(|x| x.parse::<u8>().ok())
-            .collect::<Vec<u8>>();
+pub fn solve_part_2(lo: isize, hi: isize) -> isize {
+    (lo..hi + 1)
+        .into_par_iter()
+        .filter_map(|n| if valid_2(n) { Some(n) } else { None })
+        .collect::<Vec<isize>>()
+        .len() as isize
+}
 
-        let this_is_fine = digits
-            .iter()
-            .try_fold((0u8, 1u8, false), |acc, curr| -> Option<_> {
-                if *curr < acc.0 {
-                    return None;
-                };
+fn valid_1(num: isize) -> bool {
+    let digits: Vec<u8> = num
+        .to_string()
+        .split("")
+        .into_iter()
+        .filter_map(|x| x.parse::<u8>().ok())
+        .collect::<Vec<u8>>();
 
-                if !acc.2 {
-                    if *curr != acc.0 && acc.1 >= 2 {
-                        return Some((*curr, 0, true));
-                    };
-
-                    if *curr == acc.0 {
-                        return Some((*curr, acc.1 + 1, false));
-                    };
-                };
-
-                Some((*curr, 1, acc.2))
-            });
-
-        if this_is_fine.is_some() {
-            let this_is_fine = this_is_fine.unwrap();
-            if this_is_fine.2 || this_is_fine.1 >= 2 {
-                counter += 1;
+    let this_is_fine = digits
+        .iter()
+        .try_fold((0u8, 1u8, false), |acc, curr| -> Option<_> {
+            if *curr < acc.0 {
+                return None;
             };
-        };
-    }
 
-    Ok(counter)
+            if !acc.2 {
+                if *curr != acc.0 && acc.1 >= 2 {
+                    return Some((*curr, 0, true));
+                };
+
+                if *curr == acc.0 {
+                    return Some((*curr, acc.1 + 1, false));
+                };
+            };
+
+            Some((*curr, 1, acc.2))
+        });
+
+    if this_is_fine.is_some() {
+        let this_is_fine = this_is_fine.unwrap();
+        if this_is_fine.2 || this_is_fine.1 >= 2 {
+            return true;
+        };
+    };
+
+    false
+}
+
+fn valid_2(num: isize) -> bool {
+    let digits: Vec<u8> = num
+        .to_string()
+        .split("")
+        .into_iter()
+        .filter_map(|x| x.parse::<u8>().ok())
+        .collect::<Vec<u8>>();
+
+    let this_is_fine = digits
+        .iter()
+        .try_fold((0u8, 1u8, false), |acc, curr| -> Option<_> {
+            if *curr < acc.0 {
+                return None;
+            };
+
+            if !acc.2 {
+                if *curr != acc.0 && acc.1 == 2 {
+                    return Some((*curr, 0, true));
+                };
+
+                if *curr == acc.0 {
+                    return Some((*curr, acc.1 + 1, false));
+                };
+            };
+
+            Some((*curr, 1, acc.2))
+        });
+
+    if this_is_fine.is_some() {
+        let this_is_fine = this_is_fine.unwrap();
+        if this_is_fine.2 || this_is_fine.1 == 2 {
+            return true;
+        };
+    };
+
+    false
 }
 
 #[cfg(test)]
@@ -75,13 +124,26 @@ mod tests {
     }
 
     #[test]
-    fn test_solve_part_1() {
-        assert_eq!(1660, solve_part_1(172851, 675869).expect("got err"));
+    fn test_valid_1() {
+        assert!(valid_1(111111));
+        assert!(!valid_1(223450));
+        assert!(!valid_1(123789));
     }
 
-    // #[test]
-    // fn test_solve_part_2() {
-    //     let res = parse_input(TEST_INPUT.to_string()).unwrap();
-    //     assert_eq!(610, solve_part_2(&res.0, &res.1));
-    // }
+    #[test]
+    fn test_valid_2() {
+        assert!(valid_2(112233));
+        assert!(!valid_2(123444));
+        assert!(valid_2(111122));
+    }
+
+    #[test]
+    fn test_solve_part_1() {
+        assert_eq!(1660, solve_part_1(172851, 675869));
+    }
+
+    #[test]
+    fn test_solve_part_2() {
+        assert_eq!(1135, solve_part_2(172851, 675869));
+    }
 }

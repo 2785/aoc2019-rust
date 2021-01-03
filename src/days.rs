@@ -71,3 +71,26 @@ impl Day3 {
         );
     }
 }
+
+#[derive(Clap)]
+pub struct Day4 {
+    #[clap(short = '4', long = "d4", default_value = "inputs/d4")]
+    input: String,
+}
+
+impl Day4 {
+    pub fn run(&self) {
+        let f = fs::read_to_string(&self.input).expect("error reading file");
+        let input = day4::parse_input(f).expect("error parsing input");
+
+        print!(
+            "Part 1 Solution: {}\n",
+            day4::solve_part_1(input.0, input.1)
+        );
+
+        print!(
+            "Part 2 Solution: {}\n",
+            day4::solve_part_2(input.0, input.1)
+        );
+    }
+}
