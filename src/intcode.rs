@@ -27,25 +27,42 @@ pub struct PositionNotFoundError {
 #[derive(Debug, Clone)]
 pub struct ExecutionError {
     pub msg: String,
+    pub missing_input: bool,
 }
 
 impl From<PositionNotFoundError> for ExecutionError {
     fn from(e: PositionNotFoundError) -> ExecutionError {
         ExecutionError {
             msg: format!("current pointer at {}, not found in memory", e.pos),
+            missing_input: false,
         }
     }
 }
 
 impl From<Box<dyn Error>> for ExecutionError {
     fn from(e: Box<dyn Error>) -> ExecutionError {
-        ExecutionError { msg: e.to_string() }
+        ExecutionError {
+            msg: e.to_string(),
+            missing_input: false,
+        }
     }
 }
 
 impl From<String> for ExecutionError {
     fn from(e: String) -> ExecutionError {
-        ExecutionError { msg: e }
+        ExecutionError {
+            msg: e,
+            missing_input: false,
+        }
+    }
+}
+
+impl From<&str> for ExecutionError {
+    fn from(s: &str) -> ExecutionError {
+        ExecutionError {
+            msg: s.to_string(),
+            missing_input: false,
+        }
     }
 }
 
@@ -77,7 +94,10 @@ impl IntcodeComputer {
             }
             3 => {
                 let v1 = self.get_pos(1)?;
-                let input = input.ok_or_else(|| "no input provided".to_string())?;
+                let input = input.ok_or_else(|| ExecutionError {
+                    msg: "missing input".to_string(),
+                    missing_input: true,
+                })?;
                 self.set(v1, input);
                 self.pos += 2;
                 Ok((false, None))
@@ -131,7 +151,45 @@ impl IntcodeComputer {
             99 => Ok((true, None)),
             _ => Err(ExecutionError {
                 msg: format!("unknown opcode {}", opc),
+                missing_input: false,
             }),
+        }
+    }
+
+    pub fn step_pause_on_io(&mut self) -> Result<(bool, Option<isize>), ExecutionError> {
+        loop {
+            match self.step(None) {
+                Ok(opt) => {
+                    if opt.0 == true {
+                        return Ok((true, None));
+                    }
+                    if opt.1.is_some() {
+                        return Ok((false, opt.1));
+                    }
+                }
+                Err(e) => {
+                    if e.missing_input {
+                        return Ok((false, None));
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn should_output(&mut self) -> Result<isize, ExecutionError> {
+        let r = self.step_pause_on_io()?;
+        if (r).0 {
+            return Err("this should not end".into());
+        };
+        (r.1).ok_or("expecting value".into())
+    }
+
+    pub fn should_stop_on_input(&mut self) -> Result<bool, ExecutionError> {
+        let r = self.step_pause_on_io()?;
+        if (r.1).is_some() {
+            Err("not expecting output".into())
+        } else {
+            Ok(r.0)
         }
     }
 

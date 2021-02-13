@@ -8,5 +8,6 @@ edition = "2018"
 
 [dependencies]
 clap = "3.0.0-beta.2"
+permutohedron = "0.2.4"
 rayon = "1.5"
 regex = "1"

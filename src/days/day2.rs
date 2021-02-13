@@ -44,6 +44,7 @@ pub fn solve_part_2(com: &mut IntcodeComputer) -> Result<isize, intcode::Executi
         })
         .ok_or_else(|| ExecutionError {
             msg: format!("requested value not found"),
+            missing_input: false,
         })?;
 
     Ok(found.0 * 10 + found.1)
