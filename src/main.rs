@@ -19,6 +19,7 @@ enum SubCommand {
     Day6(days::Day6),
     Day7(days::Day7),
     Day8(days::Day8),
+    Day9(days::Day9),
 }
 
 fn main() {
@@ -32,5 +33,6 @@ fn main() {
         SubCommand::Day6(d) => d.run(),
         SubCommand::Day7(d) => d.run(),
         SubCommand::Day8(d) => d.run(),
+        SubCommand::Day9(d) => d.run(),
     }
 }

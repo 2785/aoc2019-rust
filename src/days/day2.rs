@@ -38,7 +38,7 @@ pub fn solve_part_2(com: &mut IntcodeComputer) -> Result<isize, intcode::Executi
             c.set(1, *n);
             c.set(2, *v);
             while !c.step(None).expect("error stepping in intcode com").0 {}
-            com.get_val(0)
+            c.get_val(0)
                 .expect("error getting pos 0, this should not happen")
                 == 19690720
         })

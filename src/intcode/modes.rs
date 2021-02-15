@@ -1,9 +1,10 @@
 use std::error::Error;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum OpMode {
     Position,
     Immediate,
+    Relative,
 }
 
 pub fn parse_op_mode(code: isize, count: isize) -> Result<Vec<OpMode>, Box<dyn Error>> {
@@ -12,6 +13,7 @@ pub fn parse_op_mode(code: isize, count: isize) -> Result<Vec<OpMode>, Box<dyn E
         let m = match pos {
             0 => OpMode::Position,
             1 => OpMode::Immediate,
+            2 => OpMode::Relative,
             _ => {
                 return Err(format!("operation mode {} is not supported", pos)
                     .to_string()

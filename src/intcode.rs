@@ -4,10 +4,17 @@ use modes::OpMode;
 
 mod modes;
 
+#[derive(PartialEq, Debug)]
+pub enum StopEvent {
+    Finished,
+    WaitingOnInput,
+}
+
 #[derive(Clone)]
 pub struct IntcodeComputer {
     mem: HashMap<usize, isize>,
     pos: usize,
+    relative_base: isize,
 }
 
 pub fn new(d: Vec<isize>) -> IntcodeComputer {
@@ -16,7 +23,11 @@ pub fn new(d: Vec<isize>) -> IntcodeComputer {
         map.insert(i, *v);
     });
 
-    IntcodeComputer { mem: map, pos: 0 }
+    IntcodeComputer {
+        mem: map,
+        pos: 0,
+        relative_base: 0,
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -78,7 +89,7 @@ impl IntcodeComputer {
                 let mode = modes::parse_op_mode(opc / 100, 3)?;
                 let v1 = self.get_param(1, mode[0])?;
                 let v2 = self.get_param(2, mode[1])?;
-                let v3 = self.get_pos(3)?;
+                let v3 = self.get_param_write(3, mode[2])?;
                 self.set(v3, v1 + v2);
                 self.pos += 4;
                 Ok((false, None))
@@ -87,13 +98,14 @@ impl IntcodeComputer {
                 let mode = modes::parse_op_mode(opc / 100, 3)?;
                 let v1 = self.get_param(1, mode[0])?;
                 let v2 = self.get_param(2, mode[1])?;
-                let v3 = self.get_pos(3)?;
+                let v3 = self.get_param_write(3, mode[2])?;
                 self.set(v3, v1 * v2);
                 self.pos += 4;
                 Ok((false, None))
             }
             3 => {
-                let v1 = self.get_pos(1)?;
+                let mode = modes::parse_op_mode(opc / 100, 1)?;
+                let v1 = self.get_param_write(1, mode[0])?;
                 let input = input.ok_or_else(|| ExecutionError {
                     msg: "missing input".to_string(),
                     missing_input: true,
@@ -134,7 +146,7 @@ impl IntcodeComputer {
                 let mode = modes::parse_op_mode(opc / 100, 3)?;
                 let v1 = self.get_param(1, mode[0])?;
                 let v2 = self.get_param(2, mode[1])?;
-                let v3 = self.get_pos(3)?;
+                let v3 = self.get_param_write(3, mode[2])?;
                 self.set(v3, if v1 < v2 { 1 } else { 0 });
                 self.pos += 4;
                 Ok((false, None))
@@ -143,9 +155,16 @@ impl IntcodeComputer {
                 let mode = modes::parse_op_mode(opc / 100, 3)?;
                 let v1 = self.get_param(1, mode[0])?;
                 let v2 = self.get_param(2, mode[1])?;
-                let v3 = self.get_pos(3)?;
+                let v3 = self.get_param_write(3, mode[2])?;
                 self.set(v3, if v1 == v2 { 1 } else { 0 });
                 self.pos += 4;
+                Ok((false, None))
+            }
+            9 => {
+                let mode = modes::parse_op_mode(opc / 100, 1)?;
+                let v1 = self.get_param(1, mode[0])?;
+                self.relative_base += v1;
+                self.pos += 2;
                 Ok((false, None))
             }
             99 => Ok((true, None)),
@@ -193,29 +212,69 @@ impl IntcodeComputer {
         }
     }
 
-    fn get_param(&self, shift: usize, mode: OpMode) -> Result<isize, PositionNotFoundError> {
-        match mode {
-            OpMode::Position => self.get_val(self.get_pos(shift)?),
-            OpMode::Immediate => self.get_val(self.pos + shift),
+    pub fn accumulate_output_until_action(
+        &mut self,
+    ) -> Result<(Vec<isize>, StopEvent), ExecutionError> {
+        let mut outputs = Vec::new();
+        loop {
+            let r = self.step_pause_on_io()?;
+            if r.0 {
+                return Ok((outputs, StopEvent::Finished));
+            }
+            match r.1 {
+                Some(v) => outputs.push(v),
+                None => {
+                    return Ok((outputs, StopEvent::WaitingOnInput));
+                }
+            }
         }
     }
 
-    fn get_pos(&self, shift: usize) -> Result<usize, PositionNotFoundError> {
-        let pos = self
-            .mem
-            .get(&(self.pos + shift))
-            .ok_or(PositionNotFoundError {
-                pos: self.pos + shift,
-            })?;
-        Ok(*pos as usize)
+    fn get_param(&mut self, shift: usize, mode: OpMode) -> Result<isize, PositionNotFoundError> {
+        match mode {
+            OpMode::Position => {
+                let pos = self.get_pos(shift)?;
+                self.get_val(pos)
+            }
+            OpMode::Immediate => self.get_val(self.pos + shift),
+            OpMode::Relative => {
+                let pos = (self.get_pos(shift)? as isize + self.relative_base) as usize;
+                self.get_val(pos)
+            }
+        }
     }
 
-    pub fn get_val(&self, pos: usize) -> Result<isize, PositionNotFoundError> {
-        let val = self
-            .mem
-            .get(&pos)
-            .ok_or_else(|| PositionNotFoundError { pos: pos })?;
-        Ok(*val)
+    fn get_param_write(&mut self, shift: usize, mode: OpMode) -> Result<usize, ExecutionError> {
+        let loc = self.get_pos(shift)?;
+        match mode {
+            OpMode::Immediate => Err("input parameter cannot be in immediate mode".into()),
+            OpMode::Position => Ok(loc),
+            OpMode::Relative => Ok((loc as isize + self.relative_base) as usize),
+        }
+    }
+
+    fn get_pos(&mut self, shift: usize) -> Result<usize, PositionNotFoundError> {
+        let val = self.mem.get(&(self.pos + shift));
+
+        match val {
+            Some(v) => Ok(*v as usize),
+            None => {
+                self.mem.insert(self.pos + shift, 0);
+                Ok(0)
+            }
+        }
+    }
+
+    pub fn get_val(&mut self, pos: usize) -> Result<isize, PositionNotFoundError> {
+        let val = self.mem.get(&pos);
+
+        match val {
+            Some(v) => Ok(*v),
+            None => {
+                self.mem.insert(pos, 0);
+                Ok(0)
+            }
+        }
     }
 
     pub fn set(&mut self, pos: usize, val: isize) {
@@ -242,5 +301,21 @@ mod tests {
                 break;
             }
         }
+    }
+
+    #[test]
+    fn test_day9() {
+        // let mut com = new(vec![104, 1125899906842624, 99]);
+        // assert_eq!(com.should_output().unwrap(), 1125899906842624);
+
+        let mut com = new(vec![
+            109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99,
+        ]);
+        let (out, event) = com.accumulate_output_until_action().unwrap();
+        assert_eq!(event, StopEvent::Finished);
+        assert_eq!(
+            out,
+            vec![109, 1, 204, -1, 1001, 100, 1, 100, 1008, 100, 16, 101, 1006, 101, 0, 99]
+        )
     }
 }
